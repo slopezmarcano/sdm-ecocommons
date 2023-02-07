@@ -9,25 +9,67 @@ library(rjson) #json wrangling and requests
 library(jsonlite) #json wrangling
 library(httr) #http request
 library(tidyverse) #data wrangling
-
+library(sp) #wrangle spatial data points
+library(raster) #rasterise ocurrence data
+library(ggthemes) #theme for ggpplots
+library(rnaturalearth) #world map data
+library(rnaturalearthdata) 
 
 ###---OCCURRENCE DATA ---###
-link <- "https://biocache-ws.ala.org.au/ws/occurrences/search?q=taxa%3A%22galahs%22&qualityProfile=ALA&pageSize=20000"
+#link <- "https://biocache-ws.ala.org.au/ws/occurrences/search?q=taxa%3A%22galahs%22&qualityProfile=ALA&pageSize=20000"
 
 #Get data
-response <- GET(link)
+#response <- GET(link)
 
 #Turn list of lists into simple vectors and obtain content from response into JSON
-df <- purrr::flatten(fromJSON(content(response, as = "text")))
+#df <- purrr::flatten(fromJSON(content(response, as = "text")))
 
 #Convert list into a dataframe
-df <- as_tibble(df)
+#df <- as_tibble(df)
 
 ###---CLEAN OCCURRENCE DATASET ---###
-df_cleaned <- df %>%
-    filter(scientificName=='Eolophus roseicapilla',
-           basisOfRecord=='HUMAN_OBSERVATION',
-            year == 2018) %>%
-    select(uuid, scientificName, decimalLatitude, decimalLongitude, year, basisOfRecord, dataProviderName) 
+#df_cleaned <- df %>%
+    #filter(scientificName=='Eolophus roseicapilla',
+            #basisOfRecord=='HUMAN_OBSERVATION',
+            #year == 2018) %>%
+     #dplyr::select(uuid, scientificName, decimalLatitude, decimalLongitude, year, basisOfRecord, dataProviderName) 
+
+#write.csv(df_cleaned,'data/data.csv')
+
+df_cleaned <- read_csv('data/data.csv')
+
+occu <- df_cleaned %>%
+        dplyr::select(decimalLatitude, decimalLongitude)
+
+### --- SAMPLING BIAS ---###
+coordinates(occu)<- c("decimalLongitude", "decimalLatitude") #obtain coordinates
+
+raster1 <- extent(occu) #define the extent
+res1 <- 0.5 #degrees resolution
+grid <- raster(raster1, res = res1) #convert data into grid
+
+galah_raster <- rasterize(occu, grid, fun="count") #develop raster
+
+#Convert NAs into 0 to highlight sampling bias
+galah_raster[is.na(galah_raster[])] <- 0
 
 
+#Convert raster into a dataframe for ggpplot
+galah_r_df <- as.data.frame(galah_raster, xy=TRUE)
+
+# Plot the raster layer using ggplot
+ggplot(galah_r_df, aes(x=x, y=y, fill=layer)) +
+    geom_raster() +
+    scale_fill_gradient(low="grey", high="yellow") +
+    ggtitle("Species Occurrence Raster") +
+    theme_clean()
+
+#TODO Plot #2 #1 the raster layer using ggplot and australian boundary
+aus <- ne_countries(scale = "medium", country= "Australia", returnclass = 'sf')
+
+ggplot(galah_r_df, aes(x=x, y=y, fill=layer)) +
+    geom_raster() +
+    geom_polygon(aus, aes(x = ))
+    scale_fill_gradient(low="grey", high="yellow") +
+    ggtitle("Species Occurrence Raster") +
+    theme_clean()
