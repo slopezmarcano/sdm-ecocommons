@@ -1,19 +1,22 @@
 #-- DETAILS --#
 #SLM
 #Created: 07022023
-#Updated: 07022023
+#Updated: 09022023
 
 #-- LIBRARIES --#
 #library(leaflet) #mapping 
-library(rjson) #json wrangling and requests
-library(jsonlite) #json wrangling
-library(httr) #http request
+#library(rjson) #json wrangling and requests
+#library(jsonlite) #json wrangling
+#library(httr) #http request
 library(tidyverse) #data wrangling
 library(sp) #wrangle spatial data points
 library(raster) #rasterise ocurrence data
 library(ggthemes) #theme for ggpplots
-library(rnaturalearth) #world map data
-library(rnaturalearthdata) 
+#library(rnaturalearth) #world map data
+#library(rnaturalearthdata)
+library(ozmaps)
+#library(ggnewscale) #ggplot with 2 fills
+#library(ggThemeAssist) #improve layout of ggmap
 
 ###---OCCURRENCE DATA ---###
 #link <- "https://biocache-ws.ala.org.au/ws/occurrences/search?q=taxa%3A%22galahs%22&qualityProfile=ALA&pageSize=20000"
@@ -45,7 +48,7 @@ occu <- df_cleaned %>%
 coordinates(occu)<- c("decimalLongitude", "decimalLatitude") #obtain coordinates
 
 raster1 <- extent(occu) #define the extent
-res1 <- 0.5 #degrees resolution
+res1 <- 0.75 #degrees resolution
 grid <- raster(raster1, res = res1) #convert data into grid
 
 galah_raster <- rasterize(occu, grid, fun="count") #develop raster
@@ -55,21 +58,22 @@ galah_raster[is.na(galah_raster[])] <- 0
 
 
 #Convert raster into a dataframe for ggpplot
-galah_r_df <- as.data.frame(galah_raster, xy=TRUE)
+galah_r_df <- as.data.frame(galah_raster, xy=TRUE) %>%
+    rename(long = x, lat = y)
 
-# Plot the raster layer using ggplot
-ggplot(galah_r_df, aes(x=x, y=y, fill=layer)) +
-    geom_raster() +
-    scale_fill_gradient(low="grey", high="yellow") +
-    ggtitle("Species Occurrence Raster") +
-    theme_clean()
+#Obtain base map and polygons
+oz_states <- ozmaps::ozmap_states
 
-#TODO Plot #2 #1 the raster layer using ggplot and australian boundary
-aus <- ne_countries(scale = "medium", country= "Australia", returnclass = 'sf')
+#Plot
+ggplot() +
+  geom_sf(data = oz_states, fill = "white", color = "black") +
+  coord_sf() +
+  geom_tile(mapping = aes(long, lat, fill=layer), data=galah_r_df) +
+  scale_fill_gradient(low = "#ffffff00", high="red") +
+  theme_map() +
+  theme(legend.position = "bottom") +
+  labs(title = "Galah Occurrence in 2018",
+       fill = "Occurrence")
 
-ggplot(galah_r_df, aes(x=x, y=y, fill=layer)) +
-    geom_raster() +
-    geom_polygon(aus, aes(x = ))
-    scale_fill_gradient(low="grey", high="yellow") +
-    ggtitle("Species Occurrence Raster") +
-    theme_clean()
+#Save plot
+ggsave('assets/samp_bias_2018.png')
